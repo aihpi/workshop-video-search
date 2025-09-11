@@ -1,6 +1,8 @@
 import chromadb
 import logging
 import os
+
+from dotenv import load_dotenv
 from typing import Optional
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
@@ -25,6 +27,8 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+load_dotenv()
 
 EMBEDDING_MODEL_NAME = os.getenv(
     "EMBEDDING_MODEL_NAME",

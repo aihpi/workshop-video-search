@@ -3,18 +3,17 @@ from fastapi import (
     APIRouter,
     BackgroundTasks,
     HTTPException,
-    status,
     UploadFile,
     File,
     Form,
 )
-from fastapi.responses import FileResponse
 from uuid import uuid4
 import logging
 import os
 import asyncio
 import shutil
 from typing import Optional
+from dotenv import load_dotenv
 
 from app.models.transcription import (
     Transcript,
@@ -38,12 +37,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+load_dotenv()
+
 transcription_router = APIRouter()
 
 # Thread pool for CPU-bound operations
 executor = ThreadPoolExecutor(max_workers=4)
 
 TEMP_DIR = os.getenv("TMPDIR", "/tmp")
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB limit
 
 
 @transcription_router.post("/video-url", response_model=TranscriptionResponse)
@@ -152,7 +154,7 @@ async def transcribe_video_url(
 
         # Add a background task to clean up the audio file after a delay of 1 hour
         background_tasks.add_task(cleanup_file, audio_path)
-        
+
         # Add a background task to clean up frames directory after 2 hours
         background_tasks.add_task(cleanup_frames_directory, id)
 
@@ -168,8 +170,6 @@ async def transcribe_video_url(
     except Exception as e:
         logger.error(f"Error processing video: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
-
-
 
 
 @transcription_router.post("/video-file", response_model=TranscriptionResponse)
@@ -207,6 +207,17 @@ async def transcribe_video_file(
             raise HTTPException(
                 status_code=400,
                 detail=f"Unsupported file type: {video_file.content_type}. Supported types: MP4, AVI, MOV, MKV, WebM",
+            )
+
+        # Check file size
+        video_file.file.seek(0, 2)  # Seek to end of file
+        file_size = video_file.file.tell()
+        video_file.file.seek(0)  # Reset to beginning
+
+        if file_size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum size is {MAX_FILE_SIZE / (1024 * 1024):.0f} MB. Your file is {file_size / (1024 * 1024):.1f} MB.",
             )
 
         # Save uploaded file temporarily
@@ -299,7 +310,7 @@ async def transcribe_video_file(
 
         # Add a background task to clean up the audio file after a delay
         background_tasks.add_task(cleanup_file, audio_path)
-        
+
         # Add a background task to clean up frames directory after 2 hours
         background_tasks.add_task(cleanup_frames_directory, id)
 

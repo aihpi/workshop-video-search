@@ -60,7 +60,7 @@ class LLMService:
         self._backend = os.getenv("LLM_BACKEND", "ollama").lower()
 
         if self._backend == "ollama":
-            self._base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11437/v1")
+            self._base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
             self._api_key = "ollama"  # Ollama doesn't require API key
             self._model_id = os.getenv("LLM_MODEL", "qwen3:8b")
             logger.info(
@@ -68,7 +68,11 @@ class LLMService:
             )
         elif self._backend == "vllm":
             self._base_url = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
-            self._api_key = os.getenv("VLLM_API_KEY", "vllm")
+            self._api_key = os.getenv("VLLM_API_KEY")
+            if not self._api_key:
+                raise ValueError(
+                    "VLLM_API_KEY environment variable is required when using vLLM backend"
+                )
             self._model_id = os.getenv("LLM_MODEL", "qwen3:8b")
             logger.info(
                 f"Using vLLM backend at {self._base_url} with model {self._model_id}"

@@ -19,7 +19,7 @@ load_dotenv()
 LLM_BACKEND = os.getenv("LLM_BACKEND", "ollama").lower()
 
 if LLM_BACKEND == "ollama":
-    BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11437/v1")
+    BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
     API_KEY = "ollama"  # Ollama doesn't require API key
 elif LLM_BACKEND == "vllm":
     BASE_URL = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
