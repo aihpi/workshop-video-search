@@ -7,3 +7,20 @@ pyqtgraph
 nltk
 tiktoken
 torch
+
+# Video search pipeline notebook requirements
+ipykernel  # Required for running Jupyter notebooks
+openai-whisper
+yt-dlp
+chromadb
+sentence-transformers
+transformers
+sentencepiece  # Required for SIGLIP tokenizer
+pillow
+torchvision
+torchaudio
+soundfile
+plotly
+scikit-learn
+ipywidgets
+pandas

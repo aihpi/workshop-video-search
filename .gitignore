@@ -1,5 +1,7 @@
 .env
 .venv
+.venvlm
+workshop_data
 __pycache__
 .python-version
 .DS_Store
