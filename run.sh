@@ -3,11 +3,11 @@
 # Check if GPU is available
 if nvidia-smi &> /dev/null; then
     PROFILE="gpu"
-    OLLAMA_CONTAINER="video-search-ollama-gpu-1"
+    OLLAMA_SERVICE="ollama-gpu"
     echo "GPU detected - using GPU profile"
 else
     PROFILE="cpu"
-    OLLAMA_CONTAINER="video-search-ollama-cpu-1"
+    OLLAMA_SERVICE="ollama-cpu"
     echo "No GPU detected - using CPU profile"
 fi
 
@@ -23,9 +23,9 @@ done
 echo " Ready!"
 
 # Check if qwen3:8b model exists
-if ! docker exec $OLLAMA_CONTAINER ollama list | grep -q "qwen3:8b"; then
+if ! docker compose --profile $PROFILE exec -T $OLLAMA_SERVICE ollama list | grep -q "qwen3:8b"; then
     echo "Pulling qwen3:8b model (this may take a few minutes)..."
-    docker exec $OLLAMA_CONTAINER ollama pull qwen3:8b
+    docker compose --profile $PROFILE exec -T $OLLAMA_SERVICE ollama pull qwen3:8b
 else
     echo "Model qwen3:8b already available"
 fi
