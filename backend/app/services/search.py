@@ -401,7 +401,7 @@ class SearchService:
             logger.info(f"Performing visual search for question: {question}")
             logger.info(f"Transcript ID: {transcript_id}")
 
-            # Generate SigLIP text embedding for the query
+            # Generate SigLIP2 text embedding for the query
             query_embedding = visual_processing_service.generate_text_embedding(
                 question
             )

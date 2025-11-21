@@ -63,7 +63,7 @@ This application allows users to:
 
 ```bash
 git clone <repository-url>
-cd video-search
+cd workshop-video-search
 ```
 
 2. Copy the example environment file:
@@ -165,7 +165,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 ```bash
 git clone <repository-url>
-cd video-search
+cd workshop-video-search
 ```
 
 #### 2. Backend Setup
