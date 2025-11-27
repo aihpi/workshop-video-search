@@ -37,13 +37,29 @@ def transcribe_audio(audio_path: str, model_name: str, language: str) -> dict:
     try:
         logger.info(f"Transcribing audio using model {model_name}...")
 
+        # Verify audio file exists and has content
+        if not os.path.exists(audio_path):
+            raise RuntimeError(f"Audio file does not exist: {audio_path}")
+
+        file_size = os.path.getsize(audio_path)
+        if file_size < 1000:
+            raise RuntimeError(f"Audio file is too small ({file_size} bytes), cannot transcribe")
+
         model = get_model(model_name)
         result = model.transcribe(audio_path, language=language)
         logger.info("Transcription completed successfully.")
         return result
     except Exception as e:
-        logger.error(f"Error during transcription: {e}")
-        raise RuntimeError(f"Transcription failed: {e}")
+        error_msg = str(e)
+        logger.error(f"Error during transcription: {error_msg}")
+
+        # Provide more helpful error messages
+        if "reshape tensor of 0 elements" in error_msg:
+            raise RuntimeError("Audio file appears to be empty or invalid. The video may not contain audio.")
+        elif "CUDA" in error_msg or "GPU" in error_msg:
+            raise RuntimeError(f"GPU error during transcription: {error_msg}")
+        else:
+            raise RuntimeError(f"Transcription failed: {error_msg}")
 
 
 def extract_audio(video_path: str, audio_path: str) -> bool:
@@ -51,14 +67,36 @@ def extract_audio(video_path: str, audio_path: str) -> bool:
     try:
         logger.info(f"Extracting audio from {video_path}...")
         subprocess.run(
-            ["ffmpeg", "-i", video_path, "-q:a", "0", "-map", "a", audio_path],
+            [
+                "ffmpeg",
+                "-i", video_path,
+                "-vn",  # Disable video recording
+                "-acodec", "libmp3lame",  # Use MP3 codec
+                "-ar", "16000",  # Sample rate 16kHz (Whisper's native rate)
+                "-ac", "1",  # Mono audio
+                "-b:a", "128k",  # Bitrate
+                "-y",  # Overwrite output file if it exists
+                audio_path
+            ],
             check=True,
             capture_output=True,
         )
-        return os.path.exists(audio_path)
+
+        # Verify the audio file exists and is not empty
+        if not os.path.exists(audio_path):
+            raise RuntimeError("Audio file was not created")
+
+        file_size = os.path.getsize(audio_path)
+        if file_size < 1000:  # Less than 1KB is likely invalid
+            raise RuntimeError(f"Audio file is too small ({file_size} bytes), possibly no audio in video")
+
+        logger.info(f"Audio extracted successfully: {audio_path} ({file_size} bytes)")
+        return True
+
     except subprocess.CalledProcessError as e:
-        logger.error(f"Error extracting audio: {e.stderr.decode('utf-8')}")
-        raise RuntimeError(f"Failed to extract audio: {e}")
+        error_msg = e.stderr.decode('utf-8') if e.stderr else str(e)
+        logger.error(f"Error extracting audio: {error_msg}")
+        raise RuntimeError(f"Failed to extract audio: {error_msg}")
 
 
 def download_video(video_url: str, output_path: str) -> None:
