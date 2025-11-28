@@ -68,25 +68,23 @@ TRANSCRIPT:
 {transcript_text}"""
 
 
-def summarize_transcript_by_id(transcript_id: str) -> str:
+def summarize_by_video_id(video_id: str) -> str:
     """Generate a summary for a video transcript."""
     try:
-        logger.info(f"Generating summary for transcript ID: {transcript_id}")
+        logger.info(f"Generating summary for video ID: {video_id}")
 
         # Get the full transcript text from search service
-        transcript_text = search_service.get_transcript_text_by_id(transcript_id)
+        transcript_text = search_service.get_transcript_text_by_video_id(video_id)
 
         if not transcript_text:
-            logger.warning(f"No transcript found for ID: {transcript_id}")
+            logger.warning(f"No transcript found for video ID: {video_id}")
             return None
 
         prompt = create_prompt(transcript_text)
 
         summary = call_llm(prompt)
 
-        logger.info(
-            f"Successfully generated summary for transcript ID: {transcript_id}"
-        )
+        logger.info(f"Successfully generated summary for video ID: {video_id}")
 
         return summary
 

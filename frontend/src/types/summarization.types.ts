@@ -1,5 +1,5 @@
 export interface SummarizationRequest {
-  transcriptId: string;
+  videoId: string;
 }
 
 export interface SummarizationResponse {

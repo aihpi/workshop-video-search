@@ -13,11 +13,11 @@ from app.models.search import (
     SearchType,
     SemanticSearchResponse,
     VisualSearchResponse,
-    VisualSemanticSearchResponse,
 )
 from app.models.llms import LlmAnswer
 from app.services.llms import llm_service
 from app.services.visual_processing import visual_processing_service
+from app.services.video_library import video_library_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -97,7 +97,7 @@ class SearchService:
             documents = [segment.text for segment in transcript.segments]
             metadatas = [
                 {
-                    "transcript_id": transcript.id,
+                    "video_id": transcript.id,
                     "start_time": segment.start,
                     "end_time": segment.end,
                     "id": segment.id,
@@ -114,7 +114,7 @@ class SearchService:
             logger.error(f"Failed to index transcript segments: {e}")
             raise
 
-    def index_visual_embeddings(self, transcript_id: str, frame_data: dict):
+    def index_visual_embeddings(self, video_id: str, frame_data: dict):
         """Index visual embeddings for frames extracted from a video."""
         try:
             if not frame_data:
@@ -133,7 +133,7 @@ class SearchService:
                     all_embeddings.append(frame["embedding"])
                     all_metadatas.append(
                         {
-                            "transcript_id": transcript_id,
+                            "video_id": video_id,
                             "segment_id": segment_id,
                             "timestamp": frame["timestamp"],
                             "frame_path": frame["path"],
@@ -148,22 +148,22 @@ class SearchService:
             )
 
             logger.info(
-                f"Indexed {len(all_embeddings)} visual embeddings for transcript {transcript_id}."
+                f"Indexed {len(all_embeddings)} visual embeddings for video {video_id}."
             )
 
         except Exception as e:
             logger.error(f"Failed to index visual embeddings: {e}")
             raise
 
-    def get_transcript_text_by_id(self, transcript_id: str) -> Optional[str]:
-        """Retrieve the full text of a transcript by its ID by reconstructing from segments."""
+    def get_transcript_text_by_video_id(self, video_id: str) -> Optional[str]:
+        """Retrieve the full text of a transcript by its video ID by reconstructing from segments."""
         try:
-            logger.info(f"Retrieving transcript text for ID: {transcript_id}")
-            where_filter = {"transcript_id": transcript_id}
+            logger.info(f"Retrieving transcript text for video ID: {video_id}")
+            where_filter = {"video_id": video_id}
 
             results = self._collection.get(where=where_filter)
             if not results or not results["documents"]:
-                logger.warning(f"No segments found for transcript ID: {transcript_id}")
+                logger.warning(f"No segments found for video ID: {video_id}")
                 return None
 
             documents = results["documents"]
@@ -177,7 +177,7 @@ class SearchService:
             full_transcript = " ".join([segment[0] for segment in segment_pairs])
 
             logger.info(
-                f"Successfully reconstructed transcript for ID: {transcript_id}"
+                f"Successfully reconstructed transcript for video ID: {video_id}"
             )
             return full_transcript
 
@@ -185,50 +185,62 @@ class SearchService:
             logger.error(f"Failed to retrieve transcript text: {e}")
             raise
 
+    def _build_where_filter(self, video_ids: Optional[list[str]]) -> Optional[dict]:
+        """Build ChromaDB where filter for video IDs."""
+        if not video_ids:
+            return None
+        if len(video_ids) == 1:
+            return {"video_id": video_ids[0]}
+        return {"video_id": {"$in": video_ids}}
+
+    def _get_video_title(self, video_id: str) -> str:
+        """Get video title from video library."""
+        video = video_library_service.get_video(video_id)
+        return video.title if video else video_id
+
     def query_transcript(
         self,
         question: str,
-        transcript_id: Optional[str],
+        video_ids: Optional[list[str]] = None,
         top_k: Optional[int] = 5,
         search_type: Optional[SearchType] = SearchType.KEYWORD,
     ) -> QuestionResponse:
         logger.info(
-            f"Querying transcript with {search_type} search for question: {question}"
+            f"Querying transcripts with {search_type} search for question: {question}"
         )
+        logger.info(f"Video IDs filter: {video_ids if video_ids else 'all videos'}")
 
         if search_type == SearchType.KEYWORD:
-            return self._keyword_search(question, transcript_id, top_k)
+            return self._keyword_search(question, video_ids, top_k)
         elif search_type == SearchType.SEMANTIC:
-            return self._semantic_search(question, transcript_id, top_k)
+            return self._semantic_search(question, video_ids, top_k)
         elif search_type == SearchType.LLM:
-            return self._llm_search(question, transcript_id, top_k)
+            return self._llm_search(question, video_ids, top_k)
         elif search_type == SearchType.VISUAL:
-            return self._visual_search(question, transcript_id, top_k)
-        elif search_type == SearchType.VISUAL_SEMANTIC:
-            return self._visual_semantic_search(question, transcript_id, top_k)
+            return self._visual_search(question, video_ids, top_k)
         else:
             logger.warning(
                 f"Unsupported search type: {search_type}. Defaulting to keyword search."
             )
-            return self._keyword_search(question, transcript_id, top_k)
+            return self._keyword_search(question, video_ids, top_k)
 
     def _keyword_search(
-        self, question: str, transcript_id: Optional[str], top_k: Optional[int] = None
+        self, question: str, video_ids: Optional[list[str]], top_k: Optional[int] = None
     ) -> KeywordSearchResponse:
         """Perform a keyword search on transcript segments."""
 
         try:
             logger.info(f"Performing keyword search for question: {question}")
 
-            # Get all segments for the transcript
-            where_filter = {"transcript_id": transcript_id} if transcript_id else None
+            # Get all segments for the specified videos
+            where_filter = self._build_where_filter(video_ids)
 
             results = self._collection.get(where=where_filter)
 
             if not results or not results["documents"]:
-                logger.warning(f"No segments found for transcript ID: {transcript_id}")
+                logger.warning(f"No segments found for video IDs: {video_ids}")
                 return KeywordSearchResponse(
-                    question=question, transcript_id=transcript_id, results=[]
+                    question=question, video_ids=video_ids, results=[]
                 )
 
             documents = results["documents"]
@@ -244,7 +256,7 @@ class SearchService:
             if not filtered_results:
                 logger.warning(f"No keyword matches found for question: {question}")
                 return KeywordSearchResponse(
-                    question=question, transcript_id=transcript_id, results=[]
+                    question=question, video_ids=video_ids, results=[]
                 )
 
             if top_k:
@@ -256,7 +268,8 @@ class SearchService:
                     start_time=metadatas[i]["start_time"],
                     end_time=metadatas[i]["end_time"],
                     text=document,
-                    transcript_id=metadatas[i]["transcript_id"],
+                    video_id=metadatas[i]["video_id"],
+                    video_title=self._get_video_title(metadatas[i]["video_id"]),
                     relevance_score=None,
                 )
                 for i, document in filtered_results
@@ -267,7 +280,7 @@ class SearchService:
             )
 
             response = KeywordSearchResponse(
-                question=question, transcript_id=transcript_id, results=query_results
+                question=question, video_ids=video_ids, results=query_results
             )
 
             return response
@@ -276,15 +289,15 @@ class SearchService:
             raise
 
     def _semantic_search(
-        self, question: str, transcript_id: Optional[str], top_k: Optional[int] = 5
+        self, question: str, video_ids: Optional[list[str]], top_k: Optional[int] = 5
     ) -> SemanticSearchResponse:
         """Perform a semantic search on the vector database using embeddings."""
 
         try:
             logger.info(f"Performing semantic search for question: {question}")
 
-            # Restrict results to a specific transcript if transcript_id is provided
-            where_filter = {"transcript_id": transcript_id} if transcript_id else None
+            # Restrict results to specific videos if video_ids is provided
+            where_filter = self._build_where_filter(video_ids)
 
             results = self._collection.query(
                 query_texts=[question], n_results=top_k, where=where_filter
@@ -296,7 +309,7 @@ class SearchService:
             if not documents:
                 logger.warning(f"No semantic matches found for question: {question}")
                 return SemanticSearchResponse(
-                    question=question, transcript_id=transcript_id, results=[]
+                    question=question, video_ids=video_ids, results=[]
                 )
 
             distances = results["distances"][0]
@@ -309,7 +322,8 @@ class SearchService:
                     start_time=metadatas[i]["start_time"],
                     end_time=metadatas[i]["end_time"],
                     text=document,
-                    transcript_id=metadatas[i]["transcript_id"],
+                    video_id=metadatas[i]["video_id"],
+                    video_title=self._get_video_title(metadatas[i]["video_id"]),
                     relevance_score=round((1 - distances[i]) * 100, 2),
                 )
                 for i, document in enumerate(documents)
@@ -320,7 +334,7 @@ class SearchService:
             )
 
             response = SemanticSearchResponse(
-                question=question, results=query_results, transcript_id=transcript_id
+                question=question, results=query_results, video_ids=video_ids
             )
 
             return response
@@ -329,25 +343,25 @@ class SearchService:
             raise
 
     def _llm_search(
-        self, question: str, transcript_id: Optional[str], top_k: Optional[int] = 5
+        self, question: str, video_ids: Optional[list[str]], top_k: Optional[int] = 5
     ) -> LLMSearchResponse:
         """Use an LLM to synthesize an answer from semantic search results."""
 
         try:
             # First, get semantic search results (for returning in response)
             semantic_search_response: SemanticSearchResponse = self._semantic_search(
-                question, transcript_id, top_k
+                question, video_ids, top_k
             )
 
-            # Second, get all segments for the transcript (for LLM context)
-            where_filter = {"transcript_id": transcript_id} if transcript_id else None
+            # Second, get all segments for the videos (for LLM context)
+            where_filter = self._build_where_filter(video_ids)
             all_segments_result = self._collection.get(where=where_filter)
 
             if not all_segments_result or not all_segments_result["documents"]:
                 logger.warning(f"No transcript found for LLM synthesis: {question}")
                 return LLMSearchResponse(
                     question=question,
-                    transcript_id=transcript_id,
+                    video_ids=video_ids,
                     results=[],
                     summary="No transcript found.",
                     not_addressed=True,
@@ -364,7 +378,8 @@ class SearchService:
                         start_time=metadata["start_time"],
                         end_time=metadata["end_time"],
                         text=doc,
-                        transcript_id=metadata["transcript_id"],
+                        video_id=metadata["video_id"],
+                        video_title=self._get_video_title(metadata["video_id"]),
                         relevance_score=None,
                     )
                 )
@@ -380,7 +395,7 @@ class SearchService:
 
             answer_response = LLMSearchResponse(
                 question=question,
-                transcript_id=transcript_id,
+                video_ids=video_ids,
                 summary=answer.summary,
                 not_addressed=answer.not_addressed,
                 model_id=answer.model_id,
@@ -394,12 +409,12 @@ class SearchService:
             raise
 
     def _visual_search(
-        self, question: str, transcript_id: Optional[str], top_k: Optional[int] = 5
+        self, question: str, video_ids: Optional[list[str]], top_k: Optional[int] = 5
     ) -> VisualSearchResponse:
         """Perform a visual-only search using SigLIP embeddings."""
         try:
             logger.info(f"Performing visual search for question: {question}")
-            logger.info(f"Transcript ID: {transcript_id}")
+            logger.info(f"Video IDs: {video_ids}")
 
             # Generate SigLIP2 text embedding for the query
             query_embedding = visual_processing_service.generate_text_embedding(
@@ -407,8 +422,8 @@ class SearchService:
             )
             logger.info(f"Generated query embedding of length: {len(query_embedding)}")
 
-            # Restrict results to a specific transcript if transcript_id is provided
-            where_filter = {"transcript_id": transcript_id} if transcript_id else None
+            # Restrict results to specific videos if video_ids is provided
+            where_filter = self._build_where_filter(video_ids)
 
             results = self._visual_collection.query(
                 query_embeddings=[query_embedding],
@@ -427,7 +442,7 @@ class SearchService:
                     f"No visual frame matches found for question: {question}"
                 )
                 return VisualSearchResponse(
-                    question=question, transcript_id=transcript_id, results=[]
+                    question=question, video_ids=video_ids, results=[]
                 )
 
             metadatas = results["metadatas"][0]
@@ -459,7 +474,7 @@ class SearchService:
                     f"No visual segment matches found for question: {question}"
                 )
                 return VisualSearchResponse(
-                    question=question, transcript_id=transcript_id, results=[]
+                    question=question, video_ids=video_ids, results=[]
                 )
 
             segment_documents = (
@@ -474,6 +489,7 @@ class SearchService:
             for i, document in enumerate(segment_documents):
                 segment_id = segment_metadatas[i]["id"]
                 distance, frame_metadata = top_k_segments[segment_id]
+                video_id = segment_metadatas[i]["video_id"]
 
                 # Convert file system path to URL
                 frame_path = frame_metadata.get("frame_path")
@@ -486,9 +502,9 @@ class SearchService:
                         and path_parts[0] == "data"
                         and path_parts[1] == "frames"
                     ):
-                        video_id = path_parts[2]
+                        vid_id = path_parts[2]
                         filename = path_parts[3]
-                        frame_url = f"/media/frames/{video_id}/{filename}"
+                        frame_url = f"/media/frames/{vid_id}/{filename}"
 
                 query_results.append(
                     QueryResult(
@@ -496,7 +512,8 @@ class SearchService:
                         start_time=segment_metadatas[i]["start_time"],
                         end_time=segment_metadatas[i]["end_time"],
                         text=document,
-                        transcript_id=segment_metadatas[i]["transcript_id"],
+                        video_id=video_id,
+                        video_title=self._get_video_title(video_id),
                         relevance_score=round((1 - distance) * 100, 2),
                         frame_timestamp=frame_metadata.get("timestamp"),
                         frame_path=frame_url,
@@ -515,54 +532,12 @@ class SearchService:
             response = VisualSearchResponse(
                 question=question,
                 results=query_results,
-                transcript_id=transcript_id,
+                video_ids=video_ids,
             )
 
             return response
         except Exception as e:
             logger.error(f"Failed to perform visual search: {e}")
             raise
-
-    def _visual_semantic_search(
-        self, question: str, transcript_id: Optional[str], top_k: Optional[int] = 5
-    ) -> VisualSemanticSearchResponse:
-        """Perform combined visual and semantic search."""
-        try:
-            logger.info(f"Performing visual-semantic search for question: {question}")
-
-            semantic_results = self._semantic_search(question, transcript_id, top_k)
-
-            visual_results = self._visual_search(question, transcript_id, top_k)
-
-            combined_results = []
-
-            # Add semantic results with search type (no frame info for semantic)
-            for result in semantic_results.results:
-                result.search_type = SearchType.SEMANTIC
-                combined_results.append(result)
-
-            # Add visual results with search type (includes frame info)
-            for result in visual_results.results:
-                result.search_type = SearchType.VISUAL
-                combined_results.append(result)
-
-            combined_results = sorted(
-                combined_results, key=lambda x: x.relevance_score, reverse=True
-            )
-
-            response = VisualSemanticSearchResponse(
-                question=question,
-                results=combined_results,
-                transcript_id=transcript_id,
-                top_k=top_k,
-            )
-            logger.info(
-                f"Found {len(combined_results)} combined visual-semantic matches for question: {question}"
-            )
-            return response
-        except Exception as e:
-            logger.error(f"Failed to perform visual-semantic search: {e}")
-            raise
-
 
 search_service = SearchService()

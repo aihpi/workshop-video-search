@@ -36,9 +36,6 @@ const TranscriptionResult: React.FC<TranscriptionResultProps> = ({
   const [semanticResults, setSemanticResults] = useState<SegmentResult[]>([]);
   const [llmResults, setLlmResults] = useState<SegmentResult[]>([]);
   const [visualResults, setVisualResults] = useState<SegmentResult[]>([]);
-  const [visualSemanticResults, setVisualSemanticResults] = useState<
-    SegmentResult[]
-  >([]);
   const [llmAnswer, setLlmAnswer] = useState<LlmAnswer | null>(null);
 
   // Track which search methods have been used so far
@@ -47,13 +44,11 @@ const TranscriptionResult: React.FC<TranscriptionResultProps> = ({
     semantic: boolean;
     llm: boolean;
     visual: boolean;
-    visual_semantic: boolean;
   }>({
     keyword: false,
     semantic: false,
     llm: false,
     visual: false,
-    visual_semantic: false,
   });
 
   // Get results for the current active tab
@@ -67,8 +62,6 @@ const TranscriptionResult: React.FC<TranscriptionResultProps> = ({
         return llmResults;
       case "visual":
         return visualResults;
-      case "visual_semantic":
-        return visualSemanticResults;
       default:
         return [];
     }
@@ -82,8 +75,12 @@ const TranscriptionResult: React.FC<TranscriptionResultProps> = ({
         endTime: segment.end,
         text: segment.text,
         segmentId: segment.id,
-        transcriptId: transcriptionResponse.id,
+        videoId: transcriptionResponse.id,
+        videoTitle: null,
         relevanceScore: null,
+        frameTimestamp: null,
+        framePath: null,
+        searchType: null,
       } as SegmentResult;
     });
   };
@@ -105,7 +102,7 @@ const TranscriptionResult: React.FC<TranscriptionResultProps> = ({
     try {
       const response = await queryTranscript(
         question,
-        transcriptionResponse.id,
+        [transcriptionResponse.id],
         5,
         activeTab
       );
@@ -129,9 +126,6 @@ const TranscriptionResult: React.FC<TranscriptionResultProps> = ({
       } else if (response.searchType === "visual") {
         setVisualResults(response.results);
         setSearchesPerformed((prev) => ({ ...prev, visual: true }));
-      } else if (response.searchType === "visual_semantic") {
-        setVisualSemanticResults(response.results);
-        setSearchesPerformed((prev) => ({ ...prev, visual_semantic: true }));
       }
 
       setActiveSegment(null);
@@ -148,8 +142,6 @@ const TranscriptionResult: React.FC<TranscriptionResultProps> = ({
         setLlmAnswer(null);
       } else if (activeTab === "visual") {
         setVisualResults([]);
-      } else if (activeTab === "visual_semantic") {
-        setVisualSemanticResults([]);
       }
     } finally {
       setIsLoading(false);
@@ -174,10 +166,8 @@ const TranscriptionResult: React.FC<TranscriptionResultProps> = ({
       semantic: false,
       llm: false,
       visual: false,
-      visual_semantic: false,
     });
     setVisualResults([]);
-    setVisualSemanticResults([]);
     setActiveSegment(null);
     setError(null);
   };
@@ -311,27 +301,24 @@ const TranscriptionResult: React.FC<TranscriptionResultProps> = ({
               >
                 <div className="flex gap-3">
                   {/* Frame thumbnail for visual search results */}
-                  {result.framePath &&
-                    (activeTab === "visual" ||
-                      activeTab === "visual_semantic") && (
-                      <div className="flex-shrink-0">
-                        <img
-                          src={`${API_URL}${result.framePath}`}
-                          alt={`Frame at ${result.frameTimestamp}s`}
-                          className="w-32 h-20 object-cover rounded-md border border-gray-200 hover:border-indigo-300 transition-colors cursor-pointer"
-                          loading="lazy"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent parent div click
-                            window.open(`${API_URL}${result.framePath}`, '_blank');
-                          }}
-                          onError={(e) => {
-                            // Hide image if it fails to load
-                            (e.target as HTMLImageElement).style.display =
-                              "none";
-                          }}
-                        />
-                      </div>
-                    )}
+                  {result.framePath && activeTab === "visual" && (
+                    <div className="flex-shrink-0">
+                      <img
+                        src={`${API_URL}${result.framePath}`}
+                        alt={`Frame at ${result.frameTimestamp}s`}
+                        className="w-32 h-20 object-cover rounded-md border border-gray-200 hover:border-indigo-300 transition-colors cursor-pointer"
+                        loading="lazy"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent parent div click
+                          window.open(`${API_URL}${result.framePath}`, "_blank");
+                        }}
+                        onError={(e) => {
+                          // Hide image if it fails to load
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    </div>
+                  )}
 
                   <div className="flex-1">
                     <div className="flex justify-between text-sm text-gray-500 mb-1">
@@ -340,20 +327,6 @@ const TranscriptionResult: React.FC<TranscriptionResultProps> = ({
                         {formatTime(result.endTime)}
                       </span>
                       <div className="flex items-center gap-2">
-                        {activeTab === "visual_semantic" &&
-                          result.searchType && (
-                            <span
-                              className={`px-2 py-1 rounded-md text-xs font-medium ${
-                                result.searchType === "visual"
-                                  ? "bg-purple-100 text-purple-700"
-                                  : "bg-blue-100 text-blue-700"
-                              }`}
-                            >
-                              {result.searchType === "visual"
-                                ? "Visual"
-                                : "Semantic"}
-                            </span>
-                          )}
                         <span className="px-2 py-1 rounded-md text-xs font-medium">
                           {result.relevanceScore
                             ? `${result.relevanceScore}%`
@@ -379,7 +352,7 @@ const TranscriptionResult: React.FC<TranscriptionResultProps> = ({
       </div>
 
       <SummarizationPanel
-        transcriptId={transcriptionResponse.id}
+        videoId={transcriptionResponse.id}
         onError={onError || (() => {})}
       />
     </div>

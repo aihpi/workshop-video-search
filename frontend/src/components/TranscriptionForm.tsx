@@ -400,7 +400,7 @@ const TranscriptionForm = forwardRef<
           ) : videoId ? (
             // YouTube player
             <div className="p-4">
-              <YouTubePlayer ref={youtubePlayerRef} videoId={videoId} />
+              <YouTubePlayer ref={youtubePlayerRef} videoUrl={videoUrl} />
             </div>
           ) : (
             // Invalid URL message

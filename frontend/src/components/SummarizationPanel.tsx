@@ -3,12 +3,12 @@ import { summarizeTranscript } from "../services/api";
 import { LoadingIndicatorButton } from "./LoadingIndicatorButton";
 
 interface SummarizationPanelProps {
-  transcriptId: string;
+  videoId: string;
   onError: (error: Error | null) => void;
 }
 
 const SummarizationPanel: React.FC<SummarizationPanelProps> = ({
-  transcriptId,
+  videoId,
   onError,
 }) => {
   const [summary, setSummary] = useState<string | null>(null);
@@ -20,7 +20,7 @@ const SummarizationPanel: React.FC<SummarizationPanelProps> = ({
     onError(null);
 
     try {
-      const response = await summarizeTranscript(transcriptId);
+      const response = await summarizeTranscript(videoId);
       setSummary(response.summary);
     } catch (error) {
       console.error("Error during summarization:", error);
