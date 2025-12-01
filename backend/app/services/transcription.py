@@ -3,6 +3,7 @@ import logging
 import shutil
 import subprocess
 import asyncio
+import threading
 import torch
 import whisper
 from typing import Dict
@@ -16,6 +17,9 @@ logger = logging.getLogger(__name__)
 
 model_cache: Dict[str, whisper.Whisper] = {}
 DEFAULT_MODEL = "small"
+
+# Lock to ensure only one transcription runs at a time (Whisper is not thread-safe)
+_transcription_lock = threading.Lock()
 
 
 def get_model(model_name: str = DEFAULT_MODEL) -> whisper.Whisper:
@@ -34,32 +38,40 @@ def get_model(model_name: str = DEFAULT_MODEL) -> whisper.Whisper:
 
 
 def transcribe_audio(audio_path: str, model_name: str, language: str) -> dict:
-    try:
-        logger.info(f"Transcribing audio using model {model_name}...")
+    """
+    Transcribe audio using Whisper model.
 
-        # Verify audio file exists and has content
-        if not os.path.exists(audio_path):
-            raise RuntimeError(f"Audio file does not exist: {audio_path}")
+    Uses a lock to ensure thread-safety since Whisper/PyTorch models
+    are not safe to use concurrently from multiple threads.
+    """
+    # Verify audio file exists and has content before acquiring lock
+    if not os.path.exists(audio_path):
+        raise RuntimeError(f"Audio file does not exist: {audio_path}")
 
-        file_size = os.path.getsize(audio_path)
-        if file_size < 1000:
-            raise RuntimeError(f"Audio file is too small ({file_size} bytes), cannot transcribe")
+    file_size = os.path.getsize(audio_path)
+    if file_size < 1000:
+        raise RuntimeError(f"Audio file is too small ({file_size} bytes), cannot transcribe")
 
-        model = get_model(model_name)
-        result = model.transcribe(audio_path, language=language)
-        logger.info("Transcription completed successfully.")
-        return result
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(f"Error during transcription: {error_msg}")
+    # Acquire lock for model loading and transcription
+    logger.info(f"Waiting for transcription lock (model: {model_name})...")
+    with _transcription_lock:
+        try:
+            logger.info(f"Transcribing audio using model {model_name}...")
+            model = get_model(model_name)
+            result = model.transcribe(audio_path, language=language)
+            logger.info("Transcription completed successfully.")
+            return result
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Error during transcription: {error_msg}")
 
-        # Provide more helpful error messages
-        if "reshape tensor of 0 elements" in error_msg:
-            raise RuntimeError("Audio file appears to be empty or invalid. The video may not contain audio.")
-        elif "CUDA" in error_msg or "GPU" in error_msg:
-            raise RuntimeError(f"GPU error during transcription: {error_msg}")
-        else:
-            raise RuntimeError(f"Transcription failed: {error_msg}")
+            # Provide more helpful error messages
+            if "reshape tensor of 0 elements" in error_msg:
+                raise RuntimeError("Audio file appears to be empty or invalid. The video may not contain audio.")
+            elif "CUDA" in error_msg or "GPU" in error_msg:
+                raise RuntimeError(f"GPU error during transcription: {error_msg}")
+            else:
+                raise RuntimeError(f"Transcription failed: {error_msg}")
 
 
 def extract_audio(video_path: str, audio_path: str) -> bool:

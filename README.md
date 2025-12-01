@@ -6,10 +6,12 @@ A machine learning workshop demo showcasing progressively sophisticated methods 
 
 This application allows users to:
 
-- Transcribe YouTube videos and uploaded video files using OpenAI Whisper
-- Search through video content using multiple search paradigms
-- Navigate directly to relevant video segments with click-to-seek functionality
-- Use LLMs to synthesize answers from video content
+- **Build a video library** from YouTube URLs or uploaded video files
+- **Automatic transcription** using OpenAI Whisper with background processing
+- **Search through video content** using multiple search paradigms (keyword, semantic, visual, LLM)
+- **Navigate directly** to relevant video segments with click-to-seek functionality
+- **Visual search** to find specific scenes or objects using CLIP embeddings
+- **LLM synthesis** to get AI-generated answers from video content
 
 ## Search Methods (Progressive Sophistication)
 
@@ -24,7 +26,13 @@ This application allows users to:
 - **Technology**: Uses `paraphrase-multilingual-MiniLM-L12-v2` embeddings stored in ChromaDB
 - **Use Case**: Finding conceptually related content even when exact words don't match
 
-### 3. LLM Synthesis
+### 3. Visual Search
+
+- **Description**: Image-based search using visual embeddings to find visually similar content
+- **Technology**: Uses Google SigLIP2 model to encode video frames and text queries into a shared embedding space
+- **Use Case**: Finding specific scenes, objects, or visual content that may not be mentioned in the transcript
+
+### 4. LLM Synthesis
 
 - **Description**: Uses Large Language Models to synthesize coherent answers from semantic search results
 - **Technology**: Supports Ollama (local) or vLLM (production) backends
@@ -37,9 +45,10 @@ This application allows users to:
 - **FastAPI**: REST API framework
 - **OpenAI Whisper**: Speech-to-text transcription
 - **ChromaDB**: Vector database for embeddings
-- **Sentence Transformers**: Multilingual embeddings
+- **Sentence Transformers**: Multilingual text embeddings
+- **Google SigLIP2**: Visual embeddings for image-text search
 - **yt-dlp**: YouTube video downloading
-- **FFmpeg**: Audio extraction
+- **FFmpeg**: Audio/video processing
 - **Ollama/vLLM**: LLM inference backends
 
 ### Frontend
@@ -251,29 +260,46 @@ ollama pull llama3.2:3b
 
 ## API Endpoints
 
-### Transcription
+### Video Library
 
-- `POST /transcribe/video-url`: Transcribe a YouTube video from URL
-- `POST /transcribe/video-file`: Transcribe an uploaded video file
-- `GET /transcribe/audio/{filename}`: Get extracted audio file
+- `GET /library/videos`: List all videos in the library
+- `GET /library/videos/grouped`: Get videos grouped by source (YouTube/Uploaded)
+- `POST /library/videos/youtube`: Add a YouTube video by URL
+- `POST /library/videos/upload`: Upload video files
+- `DELETE /library/videos/{id}`: Delete a video
+- `POST /library/videos/{id}/retry`: Retry processing a failed video
+- `GET /library/videos/{id}/transcript`: Get transcript for a video
+- `GET /library/status`: Get background processing queue status
+- `DELETE /library/clear`: Clear entire library
 
 ### Search
 
-- `POST /search/keyword`: Keyword search in transcripts
-- `POST /search/semantic`: Semantic similarity search
-- `POST /search/llm`: LLM-synthesized answers from search results
+- `POST /search/query`: Unified search endpoint with `search_type` parameter
+  - `keyword`: Text matching in transcripts
+  - `semantic`: Vector similarity search
+  - `visual`: Image-based search using SigLIP2
+  - `llm`: LLM-synthesized answers
+
+### Media
+
+- `GET /media/video/{id}`: Stream video file (supports range requests)
+- `GET /media/thumbnail/{id}`: Get video thumbnail
 
 ### LLM Management
 
-- `GET /llms/models`: List available LLM models
+- `GET /llms`: List available LLM models
 - `POST /llms/select`: Select active LLM model
+- `GET /llms/current`: Get currently active LLM
+
+### Transcription (Legacy)
+
+- `POST /transcribe/video-url`: Transcribe a YouTube video from URL
+- `POST /transcribe/video-file`: Transcribe an uploaded video file
 
 ## Current Issues and TODOs
 
 - Highlight search keywords in keyword search results
 - Fix tokenizer parallelism warnings by setting `TOKENIZERS_PARALLELISM=false`
-- Implement VLM search functionality
-- Add progress indicators for long-running operations
 - Fix tests
 
 ## Workshop Usage
@@ -283,6 +309,7 @@ This demonstrator is designed for ML workshops to showcase:
 1. The progression from simple to sophisticated search methods
 2. How different AI technologies can be combined for better results
 3. Practical implementation of embeddings, vector databases, and LLMs
-4. The importance of user experience (click-to-seek functionality)
+4. Multi-modal AI: combining text (Whisper, embeddings) and vision (SigLIP2) models
+5. The importance of user experience (click-to-seek functionality, background processing)
 
 Each search method builds upon the previous ones, demonstrating increasing levels of AI sophistication while maintaining practical usability.

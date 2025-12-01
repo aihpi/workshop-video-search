@@ -1,21 +1,15 @@
-export type SearchType =
-  | "keyword"
-  | "semantic"
-  | "llm"
-  | "visual"
-  | "visual_semantic";
+export type SearchType = "keyword" | "semantic" | "llm" | "visual";
 
 export const SearchTypeNames: Record<SearchType, string> = {
   keyword: "Keyword Search",
   semantic: "Semantic Search",
   llm: "LLM Synthesis",
   visual: "Visual Search",
-  visual_semantic: "Visual + Semantic Search",
 };
 
 export type QuestionRequest = {
   question: string;
-  transcriptId: string;
+  videoIds?: string[]; // List of video IDs to search (null = all videos)
   topK?: number;
   searchType?: SearchType;
 };
@@ -25,7 +19,8 @@ export type SegmentResult = {
   startTime: number;
   endTime: number;
   text: string;
-  transcriptId: string;
+  videoId: string;
+  videoTitle: string | null;
   relevanceScore: number | null;
   frameTimestamp: number | null;
   framePath: string | null;
@@ -40,7 +35,7 @@ export type LlmAnswer = {
 
 export type BaseSearchResponse = {
   question: string;
-  transcriptId: string;
+  videoIds?: string[]; // Video IDs that were searched
   results: SegmentResult[];
   searchType: SearchType;
 };
@@ -62,13 +57,8 @@ export type VisualSearchResponse = BaseSearchResponse & {
   searchType: "visual";
 };
 
-export type VisualSemanticSearchResponse = BaseSearchResponse & {
-  searchType: "visual_semantic";
-};
-
 export type QuestionResponse =
   | KeywordSearchResponse
   | SemanticSearchResponse
   | LlmSearchResponse
-  | VisualSearchResponse
-  | VisualSemanticSearchResponse;
+  | VisualSearchResponse;

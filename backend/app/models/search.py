@@ -9,7 +9,6 @@ class SearchType(str, Enum):
     SEMANTIC = "semantic"
     LLM = "llm"
     VISUAL = "visual"
-    VISUAL_SEMANTIC = "visual_semantic"
 
 
 class QueryResult(CamelCaseModel):
@@ -17,7 +16,8 @@ class QueryResult(CamelCaseModel):
     start_time: float
     end_time: float
     text: str
-    transcript_id: str
+    video_id: str
+    video_title: str | None = None
     relevance_score: float | None = None
     frame_timestamp: float | None = None
     frame_path: str | None = None
@@ -26,14 +26,14 @@ class QueryResult(CamelCaseModel):
 
 class QuestionRequest(CamelCaseModel):
     question: str
-    transcript_id: str
+    video_ids: Optional[List[str]] = None  # List of video IDs to search (None = all videos)
     top_k: Optional[int] = 5
     search_type: Optional[SearchType] = SearchType.KEYWORD
 
 
 class BaseSearchResponse(CamelCaseModel):
     question: str
-    transcript_id: str
+    video_ids: Optional[List[str]] = None  # Video IDs that were searched
     results: List[QueryResult]
     search_type: SearchType
 
@@ -57,14 +57,9 @@ class VisualSearchResponse(BaseSearchResponse):
     search_type: SearchType = SearchType.VISUAL
 
 
-class VisualSemanticSearchResponse(BaseSearchResponse):
-    search_type: SearchType = SearchType.VISUAL_SEMANTIC
-
-
 QuestionResponse = (
     KeywordSearchResponse
     | SemanticSearchResponse
     | LLMSearchResponse
     | VisualSearchResponse
-    | VisualSemanticSearchResponse
 )

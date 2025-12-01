@@ -12,19 +12,18 @@ search_router = APIRouter()
 @search_router.post("/query", response_model=QuestionResponse)
 async def query_transcript(request: QuestionRequest):
     """
-    Query the transcript for relevant segments using the specified search type.
+    Query transcripts for relevant segments using the specified search type.
 
     Args:
         question: The question or search query
-        transcript_id: Optional transcript ID to restrict the search
+        video_ids: Optional list of video IDs to search (None = all videos)
         top_k: Maximum number of results to return
-        search_type: The type of search to perform (keyword, semantic, llm)
+        search_type: The type of search to perform (keyword, semantic, llm, visual)
     """
     try:
-        # The service returns different response types based on search_type
         response = search_service.query_transcript(
             question=request.question,
-            transcript_id=request.transcript_id,
+            video_ids=request.video_ids,
             top_k=request.top_k,
             search_type=request.search_type,
         )

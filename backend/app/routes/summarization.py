@@ -3,7 +3,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, HTTPException
 
-from app.services.summarization import summarize_transcript_by_id
+from app.services.summarization import summarize_by_video_id
 from app.models.summarization import SummarizationRequest, SummarizationResponse
 
 logging.basicConfig(
@@ -23,23 +23,21 @@ async def summarize_transcript(request: SummarizationRequest):
     """
     Summarizes a video transcript using an LLM.
     """
-    logger.info(
-        f"Received summarization request for transcript ID: {request.transcript_id}"
-    )
-    if not request.transcript_id:
-        raise HTTPException(status_code=400, detail="Transcript ID is required")
+    logger.info(f"Received summarization request for video ID: {request.video_id}")
+    if not request.video_id:
+        raise HTTPException(status_code=400, detail="Video ID is required")
 
     logger.info("Starting summarization...")
     try:
         summary = await asyncio.get_event_loop().run_in_executor(
             executor,
-            summarize_transcript_by_id,
-            request.transcript_id,
+            summarize_by_video_id,
+            request.video_id,
         )
         if summary is None:
             raise HTTPException(
                 status_code=404,
-                detail=f"Transcript not found for ID: {request.transcript_id}",
+                detail=f"Transcript not found for video ID: {request.video_id}",
             )
     except HTTPException:
         raise

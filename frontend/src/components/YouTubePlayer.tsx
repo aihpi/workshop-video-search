@@ -1,9 +1,7 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 
 interface YouTubePlayerProps {
-  videoId: string;
-  width?: string | number;
-  height?: string | number;
+  videoUrl: string;
 }
 
 export interface YouTubePlayerHandle {
@@ -17,10 +15,27 @@ declare global {
   }
 }
 
+/**
+ * Extract YouTube video ID from various URL formats
+ */
+function extractVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+    /^([a-zA-Z0-9_-]{11})$/, // Direct video ID
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
 const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
-  ({ videoId, width = "100%", height = "315" }, ref) => {
+  ({ videoUrl }, ref) => {
     const playerRef = useRef<any>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const videoId = extractVideoId(videoUrl);
 
     useImperativeHandle(ref, () => ({
       seekTo: (seconds: number) => {
@@ -31,6 +46,8 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
     }));
 
     useEffect(() => {
+      if (!videoId) return;
+
       // Load YouTube iframe API
       if (!window.YT) {
         const tag = document.createElement("script");
@@ -48,11 +65,10 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
       function createPlayer() {
         if (containerRef.current && window.YT) {
           playerRef.current = new window.YT.Player(containerRef.current, {
-            height: height,
-            width: width,
             videoId: videoId,
             playerVars: {
               playsinline: 1,
+              rel: 0,
             },
           });
         }
@@ -63,9 +79,25 @@ const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>(
           playerRef.current.destroy();
         }
       };
-    }, [videoId, width, height]);
+    }, [videoId]);
 
-    return <div ref={containerRef} className="video-responsive" />;
+    if (!videoId) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
+          <p>Invalid YouTube URL</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-full h-full">
+        <div
+          ref={containerRef}
+          className="w-full h-full"
+          style={{ minHeight: "100%" }}
+        />
+      </div>
+    );
   }
 );
 

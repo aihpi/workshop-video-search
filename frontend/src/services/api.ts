@@ -22,7 +22,16 @@ import type {
   SummarizationResponse,
 } from "../types/summarization.types";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:9091";
+import type {
+  AddVideoResponse,
+  AddVideosResponse,
+  ProcessingStatusResponse,
+  VideoGroupsResponse,
+  VideoLibraryResponse,
+  VideoTranscriptResponse,
+} from "../types/library.types";
+
+export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:9091";
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -91,13 +100,13 @@ export const transcribeVideoFile = async (
 
 export const queryTranscript = async (
   question: string,
-  transcriptId: string,
+  videoIds?: string[] | null,
   topK: number = 5,
   searchType: SearchType = "keyword"
 ): Promise<QuestionResponse> => {
   const requestBody: QuestionRequest = {
     question,
-    transcriptId,
+    videoIds: videoIds || undefined,
     topK,
     searchType,
   };
@@ -147,10 +156,10 @@ export const selectLlm = async (
 };
 
 export const summarizeTranscript = async (
-  transcriptId: string
+  videoId: string
 ): Promise<SummarizationResponse> => {
   const requestBody: SummarizationRequest = {
-    transcriptId,
+    videoId,
   };
 
   try {
@@ -163,4 +172,141 @@ export const summarizeTranscript = async (
     console.error("Error during summarization:", error);
     throw error;
   }
+};
+
+// Video Library API functions
+
+export const getVideoLibrary = async (): Promise<VideoLibraryResponse> => {
+  try {
+    const response = await apiClient.get<VideoLibraryResponse>(
+      "/library/videos"
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching video library:", error);
+    throw error;
+  }
+};
+
+export const getVideoGroups = async (): Promise<VideoGroupsResponse> => {
+  try {
+    const response = await apiClient.get<VideoGroupsResponse>(
+      "/library/videos/grouped"
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching video groups:", error);
+    throw error;
+  }
+};
+
+export const addYouTubeVideo = async (
+  url: string,
+  model: string = "base"
+): Promise<AddVideoResponse> => {
+  try {
+    const response = await apiClient.post<AddVideoResponse>(
+      "/library/videos/youtube",
+      { url, model }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error adding YouTube video:", error);
+    throw error;
+  }
+};
+
+export const uploadVideos = async (
+  files: File[],
+  model: string = "base"
+): Promise<AddVideosResponse> => {
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append("files", file);
+  });
+  formData.append("model", model);
+
+  try {
+    const response = await axios.post<AddVideosResponse>(
+      `${API_URL}/library/videos/upload`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error uploading videos:", error);
+    throw error;
+  }
+};
+
+export const deleteVideo = async (videoId: string): Promise<void> => {
+  try {
+    await apiClient.delete(`/library/videos/${videoId}`);
+  } catch (error) {
+    console.error("Error deleting video:", error);
+    throw error;
+  }
+};
+
+export const getProcessingStatus =
+  async (): Promise<ProcessingStatusResponse> => {
+    try {
+      const response = await apiClient.get<ProcessingStatusResponse>(
+        "/library/status"
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching processing status:", error);
+      throw error;
+    }
+  };
+
+export const retryVideo = async (videoId: string): Promise<void> => {
+  try {
+    await apiClient.post(`/library/videos/${videoId}/retry`);
+  } catch (error) {
+    console.error("Error retrying video:", error);
+    throw error;
+  }
+};
+
+export const getVideoTranscript = async (
+  videoId: string
+): Promise<VideoTranscriptResponse> => {
+  try {
+    const response = await apiClient.get<VideoTranscriptResponse>(
+      `/library/videos/${videoId}/transcript`
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching video transcript:", error);
+    throw error;
+  }
+};
+
+export const clearLibrary = async (): Promise<{
+  message: string;
+  deletedCount: number;
+  errors: Array<{ videoId: string; error: string }>;
+}> => {
+  try {
+    const response = await apiClient.delete("/library/clear");
+    return response.data;
+  } catch (error) {
+    console.error("Error clearing library:", error);
+    throw error;
+  }
+};
+
+// Helper functions for media URLs
+export const getVideoStreamUrl = (videoId: string): string => {
+  return `${API_URL}/media/video/${videoId}`;
+};
+
+export const getThumbnailUrl = (videoId: string): string => {
+  return `${API_URL}/media/thumbnail/${videoId}`;
 };
