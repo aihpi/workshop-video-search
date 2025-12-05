@@ -13,25 +13,27 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ffmpeg \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/* 
 
 # Set the working directory
 WORKDIR /app
 
-# Explicitly install CPU-only version of torch (dependency of openai-whisper)
-RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# Install uv
+RUN pip install --no-cache-dir uv
 
-# Copy only requirements.txt to leverage Docker cache
-COPY requirements.txt .
+# Copy pyproject.toml and uv.lock for dependency management
+COPY pyproject.toml .
+COPY uv.lock* .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Create virtual environment and install dependencies with CPU-only PyTorch
+RUN uv sync --extra-index-url https://download.pytorch.org/whl/cpu
 
 # Copy the rest of the application code
 COPY . .
 
 # Load default model to disk while building the image
 ARG DEFAULT_MODEL=small
-RUN python -c "import whisper; whisper.load_model('${DEFAULT_MODEL}')"
+RUN .venv/bin/python -c "import whisper; whisper.load_model('${DEFAULT_MODEL}')"
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9091"]
+CMD [".venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9091"]

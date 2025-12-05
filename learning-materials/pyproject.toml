@@ -1,0 +1,25 @@
+[project]
+name = "video-search-learning-materials"
+version = "0.1.0"
+description = "Learning materials for video search workshop - Jupyter notebooks and educational content"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "scipy",
+    "ipython",
+    "numpy",
+    "librosa",
+    "matplotlib",
+    "pyqtgraph",
+    "nltk",
+    "tiktoken",
+    "torch",
+    "jupyter",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+# Configure uv to handle platform-specific dependencies properly
+index-strategy = "unsafe-best-match"

@@ -102,7 +102,8 @@ To stop all services, press `Ctrl+C`.
 
 #### Required Software
 
-- **Python 3.10+** (3.12 recommended)
+- **Python 3.10-3.12** (3.12 recommended)
+- **uv** (for Python package management)
 - **FFmpeg** (for audio extraction)
 - **Ollama** (for LLM functionality)
 - **Node.js 18+** and npm
@@ -114,7 +115,10 @@ Verify all prerequisites are installed:
 
 ```bash
 # Check Python version
-python --version  # Should show 3.10 or higher
+python --version  # Should show 3.10-3.12
+
+# Check uv
+uv --version     # Should show uv version
 
 # Check Node.js and npm
 node --version   # Should show v18 or higher
@@ -136,7 +140,7 @@ ollama --version
 
 ```bash
 # Using Homebrew
-brew install python@3.12 node ffmpeg
+brew install python@3.12 node ffmpeg uv
 brew install --cask ollama
 
 # Start Ollama
@@ -149,8 +153,11 @@ ollama serve
 # Update package list
 sudo apt update
 
-# Install Python and pip
-sudo apt install python3.12 python3-pip
+# Install Python and essential tools
+sudo apt install python3.12 python3-pip curl
+
+# Install uv
+pip install uv
 
 # Install Node.js (via NodeSource)
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
@@ -177,22 +184,39 @@ git clone <repository-url>
 cd workshop-video-search
 ```
 
+#### Option A: Automatic Installation
+
+```bash
+# Run the installation script
+./bin/install.sh
+```
+
+The script will:
+- Check system dependencies
+- Install/update Ollama
+- Set up backend virtual environment with uv
+- Install frontend dependencies with npm
+- Download a default LLM model
+
+#### Option B: Manual Installation
+
 #### 2. Backend Setup
 
 ```bash
 cd backend
 
 # Create virtual environment (recommended)
-python -m venv venv
+uv venv .venv
 
 # Activate virtual environment
 # On macOS/Linux:
-source venv/bin/activate
+source .venv/bin/activate
+
 # On Windows:
-# venv\Scripts\activate
+# .venv\Scripts\activate
 
 # Install dependencies
-pip install -r requirements.txt
+uv sync
 
 # Run the backend server (IMPORTANT: Use this exact command)
 python -m app.main
@@ -216,7 +240,7 @@ npm run dev
 
 The frontend will start on **http://localhost:5173**
 
-### 4. Environment Configuration (Optional)
+### 5. Environment Configuration (Optional)
 
 The application works with sensible defaults. You only need a `.env` file if you want to customize the configuration.
 
@@ -246,16 +270,19 @@ LLM_BACKEND=vllm
 VLLM_BASE_URL=http://localhost:8000/v1
 ```
 
-### 5. Download LLM Model
+### 4. Download LLM Model
 
 Before using LLM synthesis, download a model with Ollama:
 
 ```bash
-# Pull the default model
-ollama pull qwen3:8b
+# Pull the default model (recommended for most systems)
+ollama pull qwen2.5:3b
+
+# Or choose a larger model for better performance (if you have sufficient resources)
+ollama pull qwen2.5:7b
 
 # Or choose a smaller model for limited resources
-ollama pull llama3.2:3b
+ollama pull llama3.2:1b
 ```
 
 ## API Endpoints

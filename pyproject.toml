@@ -1,0 +1,23 @@
+[project]
+name = "video-search"
+version = "0.1.0"
+description = "Video Search Demonstrator - Machine learning workshop showcasing video content search methods"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    # This is a meta-package that includes both backend and learning materials
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.workspace]
+members = [
+    "backend",
+    "learning-materials"
+]
+
+[tool.uv]
+# Configure uv to handle platform-specific dependencies properly
+index-strategy = "unsafe-best-match"

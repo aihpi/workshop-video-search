@@ -249,7 +249,7 @@ Please provide a concise summary of the main points in 2-3 sentences."""
             LlmInfo(
                 model_id=self._model_id,
                 display_name=self._model_id,
-                hf_model_id=os.getenv("LLM_MODEL", "Qwen/Qwen2.5-3B-Instruct"),
+                hf_model_id=os.getenv("LLM_MODEL", "Qwen/Qwen3-8B-Instruct"),
                 requires_gpu=True,
                 loaded=True,
             )
